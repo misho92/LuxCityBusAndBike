@@ -24,6 +24,12 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import android.widget.Button;
+import android.view.View;
+import java.net.*;
+import java.io.*;
+import java.util.ArrayList;
+import android.os.StrictMode;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -44,11 +50,65 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         //check sdk version
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             checkLocationPermission();
+            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+            StrictMode.setThreadPolicy(policy);
         }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        mLastLocation = new Location("My location");
+        mLastLocation.setLatitude(49.620181);
+        mLastLocation.setLongitude(6.120503);
+
+        //handling the nearest stop button click
+        final Button button = (Button) findViewById(R.id.nearest);
+        button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String stop = nearestStop();
+                //once the stop details are taken navigate user to it
+                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop"));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 14.0f));
+            }
+        });
+    }
+
+    public String nearestStop(){
+        String result = "";
+        try {
+            //take all the stations from the api
+            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
+            //read all the text returned by the server
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+            String str;
+            double nearest = 999999999;
+            while ((str = in.readLine()) != null) {
+                //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
+                if(str.contains("Beggen") || str.contains("Belair") || str.contains("Verlorenkost") || str.contains("Bonnevoie") ||
+                        str.contains("Cents") || str.contains("Cessange") || str.contains("Clausen") || str.contains("Dommeldange") ||
+                        str.contains("Eich") || str.contains("Luxembourg") || str.contains("Gasperich") || str.contains("Grund") ||
+                        str.contains("Hamm") || str.contains("Hollerich") || str.contains("Kirchberg") || str.contains("Limpertsberg") ||
+                        str.contains("Merl") || str.contains("Muhlenbach") || str.contains("Neudorf/Weimershof") || str.contains("Centre") ||
+                        str.contains("Pfaffenthal") || str.contains("Pulvermuhl") || str.contains("Rollingergrund") || str.contains("Weimerskirch")){
+                    Location stop = new Location("station");
+                    stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",",".")));
+                    stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",",".")));
+                    //check distance for each stop and remember only the one with the shortest distance
+                    if(mLastLocation.distanceTo(stop) < nearest){
+                        nearest = mLastLocation.distanceTo(stop);
+                        result = str;
+                    }
+                }
+            }
+            in.close();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     /**

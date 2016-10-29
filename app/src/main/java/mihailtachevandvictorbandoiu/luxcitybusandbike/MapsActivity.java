@@ -69,8 +69,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 String stop = nearestStop();
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop"));
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 14.0f));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop").icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
     }

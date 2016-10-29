@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start|top"
         android:id="@+id/nearest"
-        android:text="Nearest stop"
+        android:text="Nearest bus stop"
         android:padding="10dp"
         android:layout_marginTop="20dp"
         android:paddingRight="10dp"/>

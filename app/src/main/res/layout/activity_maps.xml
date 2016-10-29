@@ -13,6 +13,15 @@
         android:id="@+id/nearest"
         android:text="Nearest bus stop"
         android:padding="10dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="0dp"
+        android:paddingRight="10dp"/>
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|top"
+        android:id="@+id/nearestVeloh"
+        android:text="Nearest veloh stop"
+        android:padding="10dp"
+        android:layout_marginTop="50dp"
         android:paddingRight="10dp"/>
 </fragment>

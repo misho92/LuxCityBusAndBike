@@ -28,8 +28,8 @@ import android.widget.Button;
 import android.view.View;
 import java.net.*;
 import java.io.*;
-import java.util.ArrayList;
 import android.os.StrictMode;
+import org.json.*;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -63,8 +63,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLastLocation.setLongitude(6.120503);
 
         //handling the nearest stop button click
-        final Button button = (Button) findViewById(R.id.nearest);
-        button.setOnClickListener(new View.OnClickListener() {
+        final Button nearestBus = (Button) findViewById(R.id.nearest);
+        nearestBus.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 String stop = nearestStop();
                 //once the stop details are taken navigate user to it
@@ -73,8 +73,54 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
+
+        //handling the nearest stop button click
+        final Button nearestVeloh = (Button) findViewById(R.id.nearestVeloh);
+        nearestVeloh.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String stop = nearestVelohStop();
+                //once the stop details are taken navigate user to it
+                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(",")[3]), Double.parseDouble(stop.split(",")[4]));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop").icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
+            }
+        });
     }
 
+    //finding the nearest Veloh stop with the API provided
+    public String nearestVelohStop(){
+        String result = "";
+        try {
+            //take all the stations from the api
+            URL url = new URL("https://developer.jcdecaux.com/rest/vls/stations/Luxembourg.csv");
+            //read all the text returned by the server
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+            String str;
+            double nearest = 999999999;
+            while ((str = in.readLine()) != null) {
+                //skip the headers since they are not of our interest
+                if(!str.contains("Number")){
+                    Location stop = new Location("station");
+                    stop.setLatitude(Double.parseDouble(str.split(",")[3]));
+                    stop.setLongitude(Double.parseDouble(str.split(",")[4]));
+                    //check distance for each stop and remember only the one with the shortest distance
+                    if(mLastLocation.distanceTo(stop) < nearest){
+                        nearest = mLastLocation.distanceTo(stop);
+                        result = str;
+                    }
+                }
+            }
+            in.close();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+
+    //computing nearest bus stop with the API of mobiliteit
     public String nearestStop(){
         String result = "";
         try {

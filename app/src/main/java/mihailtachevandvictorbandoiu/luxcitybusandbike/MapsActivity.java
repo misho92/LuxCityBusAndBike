@@ -66,10 +66,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final Button nearestBus = (Button) findViewById(R.id.nearest);
         nearestBus.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                String stop = nearestStop();
+                String stop = nearestStop("bus");
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop").icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3].split(",")[1].substring(1)).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
@@ -78,77 +78,72 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final Button nearestVeloh = (Button) findViewById(R.id.nearestVeloh);
         nearestVeloh.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                String stop = nearestVelohStop();
+                String stop = nearestStop("veloh");
                 //once the stop details are taken navigate user to it
-                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(",")[3]), Double.parseDouble(stop.split(",")[4]));
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title("Nearest stop").icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)));
+                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(",")[1]), Double.parseDouble(stop.split(",")[2]));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
     }
 
-    //finding the nearest Veloh stop with the API provided
-    public String nearestVelohStop(){
+    //computing nearest bus or veloh stop with the API provided
+    public String nearestStop(String string){
         String result = "";
+        String str;
+        double nearest = 999999999;
+        String stopName;
         try {
             //take all the stations from the api
-            URL url = new URL("https://developer.jcdecaux.com/rest/vls/stations/Luxembourg.csv");
-            //read all the text returned by the server
-            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-            String str;
-            double nearest = 999999999;
-            while ((str = in.readLine()) != null) {
-                //skip the headers since they are not of our interest
-                if(!str.contains("Number")){
-                    Location stop = new Location("station");
-                    stop.setLatitude(Double.parseDouble(str.split(",")[3]));
-                    stop.setLongitude(Double.parseDouble(str.split(",")[4]));
-                    //check distance for each stop and remember only the one with the shortest distance
-                    if(mLastLocation.distanceTo(stop) < nearest){
-                        nearest = mLastLocation.distanceTo(stop);
-                        result = str;
+            if(string.equals("bus")){
+                URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
+                //read all the text returned by the server
+                BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+                while ((str = in.readLine()) != null) {
+                    //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
+                    if(str.contains("Beggen") || str.contains("Belair") || str.contains("Verlorenkost") || str.contains("Bonnevoie") ||
+                            str.contains("Cents") || str.contains("Cessange") || str.contains("Clausen") || str.contains("Dommeldange") ||
+                            str.contains("Eich") || str.contains("Luxembourg") || str.contains("Gasperich") || str.contains("Grund") ||
+                            str.contains("Hamm") || str.contains("Hollerich") || str.contains("Kirchberg") || str.contains("Limpertsberg") ||
+                            str.contains("Merl") || str.contains("Muhlenbach") || str.contains("Neudorf/Weimershof") || str.contains("Centre") ||
+                            str.contains("Pfaffenthal") || str.contains("Pulvermuhl") || str.contains("Rollingergrund") || str.contains("Weimerskirch")){
+                        Location stop = new Location("station");
+                        stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",",".")));
+                        stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",",".")));
+                        //check distance for each stop and remember only the one with the shortest distance
+                        if(mLastLocation.distanceTo(stop) < nearest){
+                            nearest = mLastLocation.distanceTo(stop);
+                            result = str;
+                        }
                     }
                 }
-            }
-            in.close();
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return result;
-    }
-
-
-    //computing nearest bus stop with the API of mobiliteit
-    public String nearestStop(){
-        String result = "";
-        try {
-            //take all the stations from the api
-            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
-            //read all the text returned by the server
-            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-            String str;
-            double nearest = 999999999;
-            while ((str = in.readLine()) != null) {
-                //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
-                if(str.contains("Beggen") || str.contains("Belair") || str.contains("Verlorenkost") || str.contains("Bonnevoie") ||
-                        str.contains("Cents") || str.contains("Cessange") || str.contains("Clausen") || str.contains("Dommeldange") ||
-                        str.contains("Eich") || str.contains("Luxembourg") || str.contains("Gasperich") || str.contains("Grund") ||
-                        str.contains("Hamm") || str.contains("Hollerich") || str.contains("Kirchberg") || str.contains("Limpertsberg") ||
-                        str.contains("Merl") || str.contains("Muhlenbach") || str.contains("Neudorf/Weimershof") || str.contains("Centre") ||
-                        str.contains("Pfaffenthal") || str.contains("Pulvermuhl") || str.contains("Rollingergrund") || str.contains("Weimerskirch")){
-                    Location stop = new Location("station");
-                    stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",",".")));
-                    stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",",".")));
-                    //check distance for each stop and remember only the one with the shortest distance
-                    if(mLastLocation.distanceTo(stop) < nearest){
-                        nearest = mLastLocation.distanceTo(stop);
-                        result = str;
+                in.close();
+            }else{
+                //URL url = new URL("https://developer.jcdecaux.com/rest/vls/stations/Luxembourg.csv");
+                URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
+                //read all the text returned by the server
+                BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+                double latitude, longitude = 0;
+                int bikes = 0;
+                while ((str = in.readLine()) != null) {
+                    String stations [] = str.split("last_update");
+                    for(int i = 0; i < stations.length - 1; i++){
+                        stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                        bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
+                        Location stop = new Location("station");
+                        latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
+                        longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
+                        stop.setLatitude(latitude);
+                        stop.setLongitude(longitude);
+                        //check distance for each stop and remember only the one with the shortest distance
+                        if(mLastLocation.distanceTo(stop) < nearest){
+                            nearest = mLastLocation.distanceTo(stop);
+                            result = stopName + "," + latitude + "," + longitude + "," + bikes;
+                        }
                     }
                 }
+                in.close();
             }
-            in.close();
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -170,6 +165,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        //list all the veloh stations with the bikes info on start up
+        listAllVelohStations();
+
         //Add a marker in Lux and move the camera
         LatLng lux = new LatLng(49.611622, 6.131935);
         mMap.addMarker(new MarkerOptions().position(lux).title("Lux City"));
@@ -190,6 +188,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         else {
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
+        }
+    }
+
+    //list all the veloh stations on initializing the map
+    public void listAllVelohStations(){
+        String str;
+        String stopName;
+        try{
+            URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
+            //read all the text returned by the server
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+            double latitude, longitude = 0;
+            int bikes = 0;
+            while ((str = in.readLine()) != null) {
+                String stations [] = str.split("last_update");
+                for(int i = 0; i < stations.length - 1; i++){
+                    stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                    bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
+                    latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
+                    longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
+                    LatLng stop = new LatLng(latitude, longitude);
+                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                }
+            }
+            in.close();
+        }catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

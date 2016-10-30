@@ -29,7 +29,11 @@ import android.view.View;
 import java.net.*;
 import java.io.*;
 import android.os.StrictMode;
-import org.json.*;
+import android.widget.EditText;
+import android.view.View.OnKeyListener;
+import android.widget.TextView;
+import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -189,6 +193,50 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
         }
+
+        final EditText distance = (EditText) findViewById(R.id.distance);
+        distance.setOnKeyListener(new OnKeyListener() {
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                // If the event is a key-down event on the "enter" button
+                if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
+                    //clear map and show only the ones that are in the specified distance
+                    mMap.clear();
+                    String str;
+                    String stopName;
+                    try{
+                        URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
+                        //read all the text returned by the server
+                        BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+                        double latitude, longitude = 0;
+                        int bikes = 0;
+                        while ((str = in.readLine()) != null) {
+                            String stations [] = str.split("last_update");
+                            for(int i = 0; i < stations.length - 1; i++){
+                                stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                                bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
+                                latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
+                                longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
+                                Location stop = new Location("station");
+                                stop.setLatitude(latitude);
+                                stop.setLongitude(longitude);
+                                //check if the stop is in the given range
+                                if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance.getText().toString())){
+                                    mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
+                                }
+                            }
+                        }
+                        in.close();
+                    }catch (MalformedURLException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
     }
 
     //list all the veloh stations on initializing the map

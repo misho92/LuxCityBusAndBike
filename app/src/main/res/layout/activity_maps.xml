@@ -24,4 +24,13 @@
         android:padding="10dp"
         android:layout_marginTop="50dp"
         android:paddingRight="10dp"/>
+    <EditText
+        android:id="@+id/distance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|bottom"
+        android:layout_marginLeft="70dp"
+        android:hint="Stops within"
+        android:inputType="numberDecimal"
+        />
 </fragment>

@@ -5,10 +5,16 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
+import android.os.Bundle;
+import android.os.StrictMode;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.View.OnKeyListener;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -24,16 +30,12 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import android.widget.Button;
-import android.view.View;
-import java.net.*;
-import java.io.*;
-import android.os.StrictMode;
-import android.widget.EditText;
-import android.view.View.OnKeyListener;
-import android.widget.TextView;
-import android.view.KeyEvent;
-import android.view.inputmethod.EditorInfo;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -71,9 +73,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         nearestBus.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 String stop = nearestStop("bus");
+                String buses = getAllBuses(stop.split(";")[1],stop.split(";")[0]);
+                //if no buses display none
+                if(buses.equals("")) buses = "none";
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3].split(",")[1].substring(1)).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3].split(",")[1].substring(1)).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
@@ -89,6 +94,47 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
+    }
+
+    //latitude and longitude are unique
+    public String getAllBuses(String latitude, String longitude){
+        String result = "";
+        String str;
+        String connectionString = "";
+        //latitude = "49,600670";
+        //longitude = "6,133646";
+        try{
+            //find connection string of the given stop
+            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
+            //read all the text returned by the server
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+            while ((str = in.readLine()) != null) {
+                if(str.contains(latitude) && str.contains(longitude)){
+                    connectionString = str; break;
+                }
+            }
+            //get all the buses currently at the particular stop
+            connectionString = connectionString.replaceAll(" ", "%20");
+            url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";","").replace(" ","") +"&format=json");
+            in = new BufferedReader(new InputStreamReader(url.openStream()));
+            while ((str = in.readLine()) != null) {
+                //there are buses
+                if(!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")){
+                    String buses [] = str.split("Product");
+                    for(int i = 1; i < buses.length; i++){
+                        //no comma if it is the final element
+                        if(i == buses.length-1) result += buses[i].split("name")[1].substring(6).split("\"")[0].trim();
+                        else result += buses[i].split("name")[1].substring(6).split("\"")[0].trim() + ",";
+                    }
+                }
+            }
+            in.close();
+        }catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     //computing nearest bus or veloh stop with the API provided
@@ -170,7 +216,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         //list all the veloh stations with the bikes info on start up
-        listAllVelohStations();
+        listAllVelohStations("all");
 
         //Add a marker in Lux and move the camera
         LatLng lux = new LatLng(49.611622, 6.131935);
@@ -197,55 +243,47 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final EditText distance = (EditText) findViewById(R.id.distance);
         distance.setOnKeyListener(new OnKeyListener() {
             public boolean onKey(View v, int keyCode, KeyEvent event) {
-                // If the event is a key-down event on the "enter" button
+                //on entering the distance and pressing enter
                 if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
                     //clear map and show only the ones that are in the specified distance
                     mMap.clear();
-                    String str;
-                    String stopName;
-                    try{
-                        URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
-                        //read all the text returned by the server
-                        BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-                        double latitude, longitude = 0;
-                        int bikes = 0;
-                        while ((str = in.readLine()) != null) {
-                            String stations [] = str.split("last_update");
-                            for(int i = 0; i < stations.length - 1; i++){
-                                stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
-                                bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
-                                latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
-                                longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
-                                Location stop = new Location("station");
-                                stop.setLatitude(latitude);
-                                stop.setLongitude(longitude);
-                                //check if the stop is in the given range
-                                if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance.getText().toString())){
-                                    mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
-                                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
-                                }
-                            }
-                        }
-                        in.close();
-                    }catch (MalformedURLException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    listAllVelohStations(distance.getText().toString());
                     return true;
                 }
                 return false;
             }
         });
+
+        /*mMap.setOnMarkerClickListener(new OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                //Toast.makeText(this, "Info Window long click", Toast.LENGTH_SHORT).show();
+                //String buses = getAllBuses(String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude));
+                //if no buses display none
+                //if(buses.equals("")) buses = "none";
+                //once the stop details are taken navigate user to it
+                marker.setSnippet("kyr");
+                //LatLng nearestStop = new LatLng(marker.getPosition().latitude, marker.getPosition().longitude);
+                //mMap.addMarker(new MarkerOptions().position(marker.getPosition()).title(marker.getTitle()).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
+                return true;
+            }
+        });*/
+        //clicking on info window
+        mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
+            @Override
+            public void onInfoWindowClick(Marker marker) {
+                Toast.makeText(getApplicationContext(), "Info window clicked", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    //list all the veloh stations on initializing the map
-    public void listAllVelohStations(){
+    //list all the veloh stations within the distance
+    public void listAllVelohStations(String distance){
         String str;
         String stopName;
         try{
             URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
-            //read all the text returned by the server
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             double latitude, longitude = 0;
             int bikes = 0;
@@ -256,8 +294,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
                     latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
                     longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
-                    LatLng stop = new LatLng(latitude, longitude);
-                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                    //list all
+                    if(distance.equals("all")){
+                        LatLng stop = new LatLng(latitude, longitude);
+                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                    }else{
+                        //list all station within the range
+                        Location stop = new Location("station");
+                        stop.setLatitude(latitude);
+                        stop.setLongitude(longitude);
+                        //check if the stop is in the given range
+                        if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)){
+                            mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
+                        }
+                    }
                 }
             }
             in.close();

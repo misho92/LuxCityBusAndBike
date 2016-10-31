@@ -1,7 +1,7 @@
 package mihailtachevandvictorbandoiu.luxcitybusandbike;
 
-
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
@@ -47,6 +47,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Location mLastLocation;
     Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
+    String [] busList;
+    String [] velohDetails;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +66,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
+        //set initial location
         mLastLocation = new Location("My location");
         mLastLocation.setLatitude(49.620181);
         mLastLocation.setLongitude(6.120503);
@@ -101,8 +104,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         String result = "";
         String str;
         String connectionString = "";
-        //latitude = "49,600670";
-        //longitude = "6,133646";
         try{
             //find connection string of the given stop
             URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
@@ -118,13 +119,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";","").replace(" ","") +"&format=json");
             in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
-                //there are buses
+                //there are buses going on
                 if(!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")){
-                    String buses [] = str.split("Product");
-                    for(int i = 1; i < buses.length; i++){
+                    //send it to the secondary activity on user click
+                    busList = str.split("Product");
+                    for(int i = 1; i < busList.length; i++){
                         //no comma if it is the final element
-                        if(i == buses.length-1) result += buses[i].split("name")[1].substring(6).split("\"")[0].trim();
-                        else result += buses[i].split("name")[1].substring(6).split("\"")[0].trim() + ",";
+                        if(i == busList.length-1) result += busList[i].split("name")[1].substring(6).split("\"")[0].trim();
+                        else result += busList[i].split("name")[1].substring(6).split("\"")[0].trim() + ",";
                     }
                 }
             }
@@ -240,6 +242,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
         }
 
+        //show the stop within particular range
         final EditText distance = (EditText) findViewById(R.id.distance);
         distance.setOnKeyListener(new OnKeyListener() {
             public boolean onKey(View v, int keyCode, KeyEvent event) {
@@ -254,26 +257,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
-        /*mMap.setOnMarkerClickListener(new OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(Marker marker) {
-                //Toast.makeText(this, "Info Window long click", Toast.LENGTH_SHORT).show();
-                //String buses = getAllBuses(String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude));
-                //if no buses display none
-                //if(buses.equals("")) buses = "none";
-                //once the stop details are taken navigate user to it
-                marker.setSnippet("kyr");
-                //LatLng nearestStop = new LatLng(marker.getPosition().latitude, marker.getPosition().longitude);
-                //mMap.addMarker(new MarkerOptions().position(marker.getPosition()).title(marker.getTitle()).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
-                //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
-                return true;
-            }
-        });*/
-        //clicking on info window
+
+        //clicking on info window which redirects to another activity for detailed information
         mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
             @Override
             public void onInfoWindowClick(Marker marker) {
                 Toast.makeText(getApplicationContext(), "Info window clicked", Toast.LENGTH_SHORT).show();
+                Bundle bundle = new Bundle();
+                double longitude = marker.getPosition().longitude;
+                //send veloh details
+                if(marker.getSnippet().contains("bike")) bundle.putStringArray("data", new String []{
+                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude)});
+                //send bus details
+                else bundle.putStringArray("data", busList);
+                Intent i = new Intent(getApplicationContext(),SecondaryActivity.class);
+                i.putExtras(bundle);
+                startActivity(i);
             }
         });
     }
@@ -299,14 +298,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         LatLng stop = new LatLng(latitude, longitude);
                         mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
                     }else{
-                        //list all station within the range
-                        Location stop = new Location("station");
-                        stop.setLatitude(latitude);
-                        stop.setLongitude(longitude);
-                        //check if the stop is in the given range
-                        if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)){
-                            mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
-                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
+                        if(!distance.equals("")){
+                            //list all station within the range
+                            Location stop = new Location("station");
+                            stop.setLatitude(latitude);
+                            stop.setLongitude(longitude);
+                            //check if the stop is in the given range
+                            if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)){
+                                mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
+                            }
                         }
                     }
                 }

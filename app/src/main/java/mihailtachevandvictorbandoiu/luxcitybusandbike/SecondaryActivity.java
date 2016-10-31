@@ -22,18 +22,19 @@ public class SecondaryActivity extends AppCompatActivity {
         ListView listView = (ListView) findViewById(R.id.buses);
         TextView textView = new TextView(getApplicationContext());
         //veloh or bus
-        if(bundle.getStringArray("data")[0].contains(".")) {
-            textView.setText("Name,status,bike stands,available bike stands,available bikes");
+        if(bundle.getStringArray("data") != null) {
+            if(bundle.getStringArray("data")[0].contains(".")) {
+                textView.setText("Name,status,bike stands,available bike stands,available bikes");
+            }
+            else {
+                textView.setText("\t Line,time,direction,operator code");
+                bus = true;
+            }
+            textView.setTextSize(22);
+            textView.setTypeface(null, Typeface.BOLD);
+            listView.addHeaderView(textView);
+            //passing data array to the custom adapter
+            listView.setAdapter(new CustomAdapter(this, bundle.getStringArray("data"),bus));
         }
-        else {
-            textView.setText("\t Line,time,direction,operator code");
-            bus = true;
-        }
-        textView.setTextSize(22);
-        textView.setTypeface(null, Typeface.BOLD);
-        listView.addHeaderView(textView);
-        //passing data array to the custom adapter
-        listView.setAdapter(new CustomAdapter(this, bundle.getStringArray("data"),bus));
-
     }
 }

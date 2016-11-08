@@ -15,6 +15,9 @@ import android.view.View;
 import android.view.View.OnKeyListener;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.SeekBar;
+import android.widget.SeekBar.OnSeekBarChangeListener;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -48,7 +51,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
     String [] busList;
-    String [] velohDetails;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +97,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(",")[1]), Double.parseDouble(stop.split(",")[2]));
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
+            }
+        });
+        //slider for distance to stops
+        final SeekBar seekBar = (SeekBar) findViewById(R.id.seekBar1);
+        final TextView textView = (TextView) findViewById(R.id.textView1);
+        seekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+            int progress = 0;
+
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progresValue, boolean fromUser) {
+                progress = progresValue;
+                Toast.makeText(getApplicationContext(), "Value changed to " + progresValue, Toast.LENGTH_SHORT).show();
+                mMap.clear();
+                listAllVelohStations(String.valueOf(progresValue));
+            }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                //Toast.makeText(getApplicationContext(), "Started tracking seekbar", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                textView.setText("Showing stops within: " + progress + " meters");
             }
         });
     }

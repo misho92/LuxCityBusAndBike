@@ -25,6 +25,22 @@
         android:padding="10dp"
         android:layout_marginTop="50dp"
         android:paddingRight="10dp"/>
+    <SeekBar
+        android:id="@+id/seekBar1"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="120dp"
+        android:max="1000"/>
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_below="@+id/seekBar1"
+        android:layout_marginTop="130dp" />
     <EditText
         android:id="@+id/distance"
         android:layout_width="wrap_content"

@@ -108,7 +108,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onProgressChanged(SeekBar seekBar, int progresValue, boolean fromUser) {
                 progress = progresValue;
-                Toast.makeText(getApplicationContext(), "Value changed to " + progresValue, Toast.LENGTH_SHORT).show();
                 mMap.clear();
                 listAllVelohStations(String.valueOf(progresValue));
             }

@@ -12,6 +12,7 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.View.OnKeyListener;
 import android.widget.Button;
 import android.widget.EditText;
@@ -19,6 +20,7 @@ import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -83,7 +85,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if(buses.equals("")) buses = "none";
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3].split(",")[1].substring(1)).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
         });
@@ -119,6 +121,24 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 textView.setText("Showing stops within: " + progress + " meters");
+            }
+        });
+
+        //switch bus or veloh mode
+        final ToggleButton toggle = (ToggleButton) findViewById(R.id.toggleButton1);
+        toggle.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(toggle.isChecked()){
+                    Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_SHORT).show();
+                    mMap.clear();
+                    listAllBusStations();
+                }
+                else{
+                    Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_SHORT).show();
+                    mMap.clear();
+                    listAllVelohStations("all");
+                }
             }
         });
     }
@@ -177,12 +197,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
                 while ((str = in.readLine()) != null) {
                     //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
-                    if(str.contains("Beggen") || str.contains("Belair") || str.contains("Verlorenkost") || str.contains("Bonnevoie") ||
-                            str.contains("Cents") || str.contains("Cessange") || str.contains("Clausen") || str.contains("Dommeldange") ||
-                            str.contains("Eich") || str.contains("Luxembourg") || str.contains("Gasperich") || str.contains("Grund") ||
-                            str.contains("Hamm") || str.contains("Hollerich") || str.contains("Kirchberg") || str.contains("Limpertsberg") ||
-                            str.contains("Merl") || str.contains("Muhlenbach") || str.contains("Neudorf/Weimershof") || str.contains("Centre") ||
-                            str.contains("Pfaffenthal") || str.contains("Pulvermuhl") || str.contains("Rollingergrund") || str.contains("Weimerskirch")){
+                    if(str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
+                            str.contains("Cents,") || str.contains("Cessange,") || str.contains("Clausen,") || str.contains("Dommeldange,") ||
+                            str.contains("Eich,") || str.contains("Luxembourg,") || str.contains("Gasperich,") || str.contains("Grund,") ||
+                            str.contains("Hamm,") || str.contains("Hollerich,") || str.contains("Kirchberg,") || str.contains("Limpertsberg,") ||
+                            str.contains("Merl,") || str.contains("Muhlenbach,") || str.contains("Neudorf/Weimershof,") ||
+                            str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
+                            || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
                         Location stop = new Location("station");
                         stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",",".")));
                         stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",",".")));
@@ -344,6 +365,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    //list all the bus stations
+    public void listAllBusStations(){
+        String str;
+        String stopName;
+        try{
+            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+            while ((str = in.readLine()) != null) {
+                //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
+                if(str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
+                        str.contains("Cents,") || str.contains("Cessange,") || str.contains("Clausen,") || str.contains("Dommeldange,") ||
+                        str.contains("Eich,") || str.contains("Luxembourg,") || str.contains("Gasperich,") || str.contains("Grund,") ||
+                        str.contains("Hamm,") || str.contains("Hollerich,") || str.contains("Kirchberg,") || str.contains("Limpertsberg,") ||
+                        str.contains("Merl,") || str.contains("Muhlenbach,") || str.contains("Neudorf/Weimershof,") ||
+                        str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
+                        || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
+                    stopName = str.split(";")[3];
+                    LatLng stop = new LatLng(Double.parseDouble(str.split(";")[1].replace(",",".")), Double.parseDouble(str.split(";")[0].replace(",",".")));
+                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: "));
+                }
+            }
+            in.close();
+        }catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     protected synchronized void buildGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -367,7 +417,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onConnectionSuspended(int i) {
-
+        Toast.makeText(getApplicationContext(), "Connection suspended!", Toast.LENGTH_LONG).show();
     }
 
     @Override
@@ -398,7 +448,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
-
+        Toast.makeText(getApplicationContext(), "Connection failed!", Toast.LENGTH_LONG).show();
     }
 
     //check permissions

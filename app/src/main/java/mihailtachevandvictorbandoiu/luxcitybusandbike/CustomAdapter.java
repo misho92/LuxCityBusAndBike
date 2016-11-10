@@ -3,7 +3,9 @@ package mihailtachevandvictorbandoiu.luxcitybusandbike;
 /**
  * Created by Michael on 31.10.2016 г..
  */
+
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -18,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Calendar;
 
 //own custom implementation for adapter class
 public class CustomAdapter extends BaseAdapter{
@@ -25,7 +28,7 @@ public class CustomAdapter extends BaseAdapter{
     String [] result;
     Context context;
     boolean bus;
-    private static LayoutInflater inflater=null;
+    private static LayoutInflater inflater = null;
 
     public CustomAdapter(SecondaryActivity secondaryActivity, String[] data, boolean bus) {
 
@@ -34,6 +37,7 @@ public class CustomAdapter extends BaseAdapter{
 
         //veloh details
         if(data[0].contains(".")){
+            this.bus = false;
             result = new String[1];
             String str;
             try{
@@ -68,6 +72,7 @@ public class CustomAdapter extends BaseAdapter{
                 e.printStackTrace();
             }
         }else{
+            this.bus = true;
             //bus details
             result = new String [data.length - 1];
             //handling and parsing the data
@@ -78,8 +83,8 @@ public class CustomAdapter extends BaseAdapter{
                 row += data[i].split("time")[1].substring(3).split("\"")[0] + ", ";
                 //direction
                 row += data[i].split("direction")[1].substring(3).split("\"")[0] + ", ";
-                //operator code
-                row += data[i].split("operatorCode")[1].substring(3).split("\"")[0];
+                //operator code, but not all have such code
+                if(data[i].contains("operatorCode")) row += data[i].split("operatorCode")[1].substring(3).split("\"")[0];
                 //populate the output array
                 result[i - 1] = row;
                 row = "";
@@ -117,6 +122,16 @@ public class CustomAdapter extends BaseAdapter{
         holder.textView = (TextView) rowView.findViewById(R.id.textView);
         holder.img = (ImageView) rowView.findViewById(R.id.imageView);
         holder.textView.setText(result[position]);
+        if(bus){
+            Calendar now = Calendar.getInstance();
+            Calendar busTime = Calendar.getInstance();
+            String hour = result[position].split(",")[1].split(":")[0].trim();
+            String min = result[position].split(":")[1];
+            busTime.set(now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DATE), Integer.valueOf(hour), Integer.valueOf(min));
+            //red = bus is late, otherwise on time
+            if(now.after(busTime)) holder.textView.setBackgroundColor(Color.RED);
+            else holder.textView.setBackgroundColor(Color.GREEN);
+        }
         if(bus)holder.img.setImageResource(R.drawable.bus);
         else holder.img.setImageResource(R.drawable.bike);
         rowView.setOnClickListener(new OnClickListener() {

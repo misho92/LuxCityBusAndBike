@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.HashMap;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -53,6 +54,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
     String [] busList;
+    //save for each stop its bus list
+    HashMap<String,String[]> busListStop = new HashMap<String,String[]>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,12 +133,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onClick(View v) {
                 if(toggle.isChecked()){
-                    Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
                     mMap.clear();
                     listAllBusStations();
                 }
                 else{
-                    Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_LONG).show();
                     mMap.clear();
                     listAllVelohStations("all");
                 }
@@ -148,6 +151,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         String result = "";
         String str;
         String connectionString = "";
+        String stop = "";
         try{
             //find connection string of the given stop
             URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
@@ -155,6 +159,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
                 if(str.contains(latitude) && str.contains(longitude)){
+                    stop = str.split("O")[1].substring(1).split("@")[0];
                     connectionString = str; break;
                 }
             }
@@ -167,6 +172,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if(!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")){
                     //send it to the secondary activity on user click
                     busList = str.split("Product");
+                    busListStop.put(stop,busList);
                     for(int i = 1; i < busList.length; i++){
                         //no comma if it is the final element
                         if(i == busList.length-1) result += busList[i].split("name")[1].substring(6).split("\"")[0].trim();
@@ -179,6 +185,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+            /*some bus stops like bouillon cannot extract data since it is not working in the same way as others
+            the one on the website - http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&id=A=1@O=Belair,%20Sacr%C3%A9-Coeur@X=6,113204@Y=49,610279@U=82@L=200403005@B=1@p=1459856195&format=json
+            however for Bouillon - http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&id=A=1@O=Hollerich,%20P+R%20Bouillon@X=6,107208@Y=49,599996@U=82@L=200415009@B=1@p=1478177594&format=json
+            displays error
+            */
+            result = "cannot access api data";
         }
         return result;
     }
@@ -312,9 +324,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 double longitude = marker.getPosition().longitude;
                 //send veloh details
                 if(marker.getSnippet().contains("bike")) bundle.putStringArray("data", new String []{
-                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude)});
+                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude),"bike"});
                 //send bus details
-                else bundle.putStringArray("data", busList);
+                else bundle.putStringArray("data", busListStop.get(marker.getTitle()));
                 Intent i = new Intent(getApplicationContext(),SecondaryActivity.class);
                 i.putExtras(bundle);
                 startActivity(i);
@@ -369,6 +381,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void listAllBusStations(){
         String str;
         String stopName;
+        Toast.makeText(getApplicationContext(), "Loading bus stops", Toast.LENGTH_LONG).show();
         try{
             URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
@@ -381,9 +394,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         str.contains("Merl,") || str.contains("Muhlenbach,") || str.contains("Neudorf/Weimershof,") ||
                         str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
                         || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
+                    String buses = getAllBuses(str.split(";")[1], str.split(";")[0]);
+                    if(buses.equals("")) buses = "none";
                     stopName = str.split(";")[3];
                     LatLng stop = new LatLng(Double.parseDouble(str.split(";")[1].replace(",",".")), Double.parseDouble(str.split(";")[0].replace(",",".")));
-                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: "));
+                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 }
             }
             in.close();
@@ -449,6 +464,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
         Toast.makeText(getApplicationContext(), "Connection failed!", Toast.LENGTH_LONG).show();
+    }
+
+    //handling the lifecycles
+    @Override
+    public void onPause() {
+        super.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 
     //check permissions

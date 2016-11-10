@@ -21,9 +21,10 @@ public class SecondaryActivity extends AppCompatActivity {
         boolean bus = false;
         ListView listView = (ListView) findViewById(R.id.buses);
         TextView textView = new TextView(getApplicationContext());
+        String [] data = bundle.getStringArray("data");
         //veloh or bus
         if(bundle.getStringArray("data") != null) {
-            if(bundle.getStringArray("data")[0].contains(".")) {
+            if(bundle.getStringArray("data").length == 2) {
                 textView.setText("Name,status,bike stands,available bike stands,available bikes");
             }
             else {

@@ -24,7 +24,7 @@ public class SecondaryActivity extends AppCompatActivity {
         String [] data = bundle.getStringArray("data");
         //veloh or bus
         if(bundle.getStringArray("data") != null) {
-            if(bundle.getStringArray("data").length == 2) {
+            if(bundle.getStringArray("data")[0].equals("bike")) {
                 textView.setText("Name,status,bike stands,available bike stands,available bikes");
             }
             else {

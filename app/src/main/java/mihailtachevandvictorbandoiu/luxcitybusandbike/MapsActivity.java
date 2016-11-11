@@ -10,6 +10,7 @@ import android.os.StrictMode;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -133,50 +134,41 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onClick(View v) {
                 if(toggle.isChecked()){
-                    Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
                     mMap.clear();
+                    long startTime = System.nanoTime();
                     listAllBusStations();
+                    Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
+                    long estimatedTime = System.nanoTime() - startTime;
+                    Log.d("time",String.valueOf(estimatedTime));
                 }
                 else{
-                    Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_LONG).show();
                     mMap.clear();
                     listAllVelohStations("all");
+                    Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_LONG).show();
                 }
             }
         });
     }
 
-    //latitude and longitude are unique
-    public String getAllBuses(String latitude, String longitude){
+    //get all the bus data about a specific bus stop
+    public String getAllBuses(String connectionString, String stop){
         String result = "";
         String str;
-        String connectionString = "";
-        String stop = "";
         try{
-            //find connection string of the given stop
-            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
-            //read all the text returned by the server
-            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-            while ((str = in.readLine()) != null) {
-                if(str.contains(latitude) && str.contains(longitude)){
-                    stop = str.split("O")[1].substring(1).split("@")[0];
-                    connectionString = str; break;
-                }
-            }
             //get all the buses currently at the particular stop
             connectionString = connectionString.replaceAll(" ", "%20");
-            url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";","").replace(" ","") +"&format=json");
-            in = new BufferedReader(new InputStreamReader(url.openStream()));
+            URL url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";","").replace(" ","") +"&format=json");
+            BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
                 //there are buses going on
                 if(!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")){
                     //send it to the secondary activity on user click
-                    busList = str.split("Product");
+                    busList = str.split("line");
                     busListStop.put(stop,busList);
                     for(int i = 1; i < busList.length; i++){
                         //no comma if it is the final element
-                        if(i == busList.length-1) result += busList[i].split("name")[1].substring(6).split("\"")[0].trim();
-                        else result += busList[i].split("name")[1].substring(6).split("\"")[0].trim() + ",";
+                        if(i == busList.length-1) result += busList[i].substring(3).split("\"")[0];
+                        else result += busList[i].substring(3).split("\"")[0] + ",";
                     }
                 }
             }
@@ -323,8 +315,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Bundle bundle = new Bundle();
                 double longitude = marker.getPosition().longitude;
                 //send veloh details
-                if(marker.getSnippet().contains("bike")) bundle.putStringArray("data", new String []{
-                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude),"bike"});
+                if(marker.getSnippet().contains("bike")) bundle.putStringArray("data", new String []{"bike",
+                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude)});
                 //send bus details
                 else bundle.putStringArray("data", busListStop.get(marker.getTitle()));
                 Intent i = new Intent(getApplicationContext(),SecondaryActivity.class);
@@ -381,9 +373,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void listAllBusStations(){
         String str;
         String stopName;
-        Toast.makeText(getApplicationContext(), "Loading bus stops", Toast.LENGTH_LONG).show();
         try{
-            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
+            URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
                 //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
@@ -394,10 +385,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         str.contains("Merl,") || str.contains("Muhlenbach,") || str.contains("Neudorf/Weimershof,") ||
                         str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
                         || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
-                    String buses = getAllBuses(str.split(";")[1], str.split(";")[0]);
+                    stopName = str.split("O")[1].substring(1).split("@")[0];
+                    String buses = getAllBuses(str,stopName);
                     if(buses.equals("")) buses = "none";
-                    stopName = str.split(";")[3];
-                    LatLng stop = new LatLng(Double.parseDouble(str.split(";")[1].replace(",",".")), Double.parseDouble(str.split(";")[0].replace(",",".")));
+                    LatLng stop = new LatLng(Double.parseDouble(str.split("Y=")[1].split("@")[0].replace(",",".")),
+                            Double.parseDouble(str.split("X=")[1].split("@")[0].replace(",",".")));
                     mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 }
             }

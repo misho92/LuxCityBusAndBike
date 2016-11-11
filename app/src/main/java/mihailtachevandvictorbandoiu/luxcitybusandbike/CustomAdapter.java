@@ -36,7 +36,7 @@ public class CustomAdapter extends BaseAdapter{
         this.bus = bus;
 
         //veloh details
-        if(data[0].contains(".")){
+        if(!bus){
             this.bus = false;
             result = new String[1];
             String str;
@@ -78,7 +78,7 @@ public class CustomAdapter extends BaseAdapter{
             //handling and parsing the data
             for(int i = 1; i < data.length; i++){
                 //line
-                row += data[i].split("name")[1].substring(6).split("\"")[0].trim() + ", ";
+                row += data[i].substring(3).split("\"")[0].trim() + ", ";
                 //time
                 row += data[i].split("time")[1].substring(3).split("\"")[0] + ", ";
                 //direction

@@ -11,12 +11,13 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.View.OnKeyListener;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -42,7 +43,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+
+import static mihailtachevandvictorbandoiu.luxcitybusandbike.R.id.buses;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -55,8 +59,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
     String [] busList;
+    ArrayList<String> allStops;
     //save for each stop its bus list
     HashMap<String,String[]> busListStop = new HashMap<String,String[]>();
+    //coordinates of a stop
+    HashMap<String,String> coordinates = new HashMap<String,String>();
+    HashMap<String,String> connString = new HashMap<String,String>();
+    AutoCompleteTextView auto;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -148,6 +157,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
+        allStops = new ArrayList<String>();
     }
 
     //get all the bus data about a specific bus stop
@@ -269,6 +279,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         //list all the veloh stations with the bikes info on start up
         listAllVelohStations("all");
 
+        mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                if(marker.getSnippet().contains("Buses")) {
+                    String buses = getAllBuses(connString.get(marker.getTitle()),marker.getTitle());
+                    if(buses.equals("")) buses = "none";
+                    marker.setSnippet("Buses: " + buses);
+                }
+                return false;
+            }
+        });
+
+        //auto completion for all stops
+        auto = (AutoCompleteTextView)findViewById(R.id.autoCompleteTextView1);
+        String[] stops = new String[allStops.size()];
+        stops = allStops.toArray(stops);
+        ArrayAdapter adapter = new ArrayAdapter(this,android.R.layout.simple_list_item_1,stops);
+        auto.setAdapter(adapter);
+        auto.setThreshold(1);
+
+        auto.setOnItemClickListener(new OnItemClickListener() {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long rowId) {
+                String stop = (String)parent.getItemAtPosition(position);
+                LatLng coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
+                        Double.parseDouble(coordinates.get(stop).split(";")[1]));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 16.0f));
+            }
+        });
+
         //Add a marker in Lux and move the camera
         LatLng lux = new LatLng(49.611622, 6.131935);
         mMap.addMarker(new MarkerOptions().position(lux).title("Lux City"));
@@ -290,22 +329,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
         }
-
-        //show the stop within particular range
-        final EditText distance = (EditText) findViewById(R.id.distance);
-        distance.setOnKeyListener(new OnKeyListener() {
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                //on entering the distance and pressing enter
-                if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
-                    //clear map and show only the ones that are in the specified distance
-                    mMap.clear();
-                    listAllVelohStations(distance.getText().toString());
-                    return true;
-                }
-                return false;
-            }
-        });
-
 
         //clicking on info window which redirects to another activity for detailed information
         mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
@@ -339,9 +362,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 String stations [] = str.split("last_update");
                 for(int i = 0; i < stations.length - 1; i++){
                     stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                    allStops.add(stopName);
                     bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
                     latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
                     longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
+                    coordinates.put(stopName,latitude + ";" + longitude);
                     //list all
                     if(distance.equals("all")){
                         LatLng stop = new LatLng(latitude, longitude);
@@ -386,10 +411,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
                         || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
                     stopName = str.split("O")[1].substring(1).split("@")[0];
-                    String buses = getAllBuses(str,stopName);
-                    if(buses.equals("")) buses = "none";
+                    allStops.add(stopName);
+                    connString.put(stopName,str);
+                    //String buses = getAllBuses(str,stopName);
+                    //if(buses.equals("")) buses = "none";
                     LatLng stop = new LatLng(Double.parseDouble(str.split("Y=")[1].split("@")[0].replace(",",".")),
                             Double.parseDouble(str.split("X=")[1].split("@")[0].replace(",",".")));
+                    coordinates.put(stopName,str.split("Y=")[1].split("@")[0].replace(",",".") + ";" +
+                            str.split("X=")[1].split("@")[0].replace(",","."));
                     mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 }
             }

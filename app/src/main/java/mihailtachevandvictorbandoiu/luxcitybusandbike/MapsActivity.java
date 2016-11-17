@@ -20,6 +20,9 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.RadioGroup.OnCheckedChangeListener;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -39,6 +42,7 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 import org.json.JSONObject;
@@ -72,10 +76,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     HashMap<String, String> coordinates = new HashMap<String, String>();
     HashMap<String, String> connString = new HashMap<String, String>();
     AutoCompleteTextView auto;
-
     Button route;
-    Double nearestLat;
-    Double nearestLng;
+    LatLng nearestStation = null;
+    String mode = "walking";
+    RadioButton modeButton;
+    RadioGroup modeGroup;
+    Polyline line;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,14 +111,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         nearestBus.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 route.setVisibility(View.VISIBLE);
+                modeGroup.setVisibility(View.VISIBLE);
                 String stop = nearestStop("bus");
                 String buses = getAllBuses(stop.split(";")[1], stop.split(";")[0]);
                 //if no buses display none
                 if (buses.equals("")) buses = "none";
-                nearestLat = Double.parseDouble(stop.split(";")[1].replace(",", "."));
-                nearestLng = Double.parseDouble(stop.split(";")[0].replace(",", "."));
+                nearestStation = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",", ".")),
+                        Double.parseDouble(stop.split(";")[0].replace(",", ".")));
                 //once the stop details are taken navigate user to it
-                LatLng nearestStop = new LatLng(nearestLat, nearestLng);
+                LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
@@ -123,11 +130,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         nearestVeloh.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 route.setVisibility(View.VISIBLE);
+                modeGroup.setVisibility(View.VISIBLE);
                 String stop = nearestStop("veloh");
-                nearestLat = Double.parseDouble(stop.split(",")[1]);
-                nearestLng = Double.parseDouble(stop.split(",")[2]);
+                nearestStation = new LatLng(Double.parseDouble(stop.split(",")[1]),
+                        Double.parseDouble(stop.split(",")[2]));
                 //once the stop details are taken navigate user to it
-                LatLng nearestStop = new LatLng(nearestLat, nearestLng);
+                LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
@@ -178,15 +186,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         allStops = new ArrayList<String>();
 
-        route.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
+        modeGroup = (RadioGroup) findViewById(R.id.mode);
+
+        modeGroup.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                modeButton = (RadioButton) findViewById(checkedId);
+                mode = modeButton.getText().toString();
+                Toast.makeText(getApplicationContext(), "Selected " + mode, Toast.LENGTH_LONG).show();
+            }
+        });
+
+        route.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(line != null) line.remove();
                 showRoute();
             }
         });
     }
 
     //get all the bus data about a specific bus stop
-    public String getAllBuses(String connectionString, String stop) {
+    private String getAllBuses(String connectionString, String stop) {
         String result = "";
         String str;
         try {
@@ -224,7 +245,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //computing nearest bus or veloh stop with the API provided
-    public String nearestStop(String string) {
+    private String nearestStop(String string) {
         String result = "";
         String str;
         double nearest = 999999999;
@@ -376,7 +397,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //list all the veloh stations within the distance
-    public void listAllVelohStations(String distance) {
+    private void listAllVelohStations(String distance) {
         String str;
         String stopName;
         try {
@@ -421,7 +442,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //list all the bus stations
-    public void listAllBusStations() {
+    private void listAllBusStations() {
         String str;
         String stopName;
         try {
@@ -578,26 +599,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void showRoute(){
         MarkerOptions options = new MarkerOptions();
         options.position(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()));
-        options.position(new LatLng(nearestLat,nearestLng));
+        options.position(nearestStation);
         mMap.addMarker(options);
         String url = getMapsApiDirectionsUrl();
         ReadTask downloadTask = new ReadTask();
         downloadTask.execute(url);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 16));
-        addMarkers();
     }
 
-    //maps data
+    //directions api data
     private String getMapsApiDirectionsUrl() {
-        return "https://maps.googleapis.com/maps/api/directions/json?origin=" + mLastLocation.getLatitude() + "," + mLastLocation.getLongitude() + "&mode=walking&destination=" + nearestLat + "," + nearestLng + "&key=AIzaSyB5FzALlUScawxBeTcoaBOdf5Rch9hZu-A";
-    }
-
-    //add markers
-    private void addMarkers() {
-        if (mMap != null) {
-            mMap.addMarker(new MarkerOptions().position(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude())).title("Current position"));
-            mMap.addMarker(new MarkerOptions().position(new LatLng(nearestLat,nearestLng)).title("Nearest stop"));
-        }
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=" + mLastLocation.getLatitude() + "," +
+                mLastLocation.getLongitude() + "&destination=" + nearestStation.latitude + "," +
+                nearestStation.longitude + "&mode=" + mode + "&key=AIzaSyB5FzALlUScawxBeTcoaBOdf5Rch9hZu-A";
     }
 
     //background task
@@ -647,7 +661,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             ArrayList<LatLng> points = null;
             PolylineOptions polyLineOptions = null;
 
-            // traversing through routes
+            //traversing through routes
             for (int i = 0; i < routes.size(); i++) {
                 points = new ArrayList<LatLng>();
                 polyLineOptions = new PolylineOptions();
@@ -668,7 +682,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 polyLineOptions.color(Color.BLUE);
             }
 
-            mMap.addPolyline(polyLineOptions);
+            line = mMap.addPolyline(polyLineOptions);
         }
     }
 }

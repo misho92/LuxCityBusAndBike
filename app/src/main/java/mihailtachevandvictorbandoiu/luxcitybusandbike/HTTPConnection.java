@@ -15,6 +15,7 @@ import java.net.URL;
 
 //connecting to the url
 public class HTTPConnection {
+
     public String readUrl(String mapsApiDirectionsUrl) throws IOException {
         String data = "";
         InputStream iStream = null;
@@ -24,8 +25,7 @@ public class HTTPConnection {
             urlConnection = (HttpURLConnection) url.openConnection();
             urlConnection.connect();
             iStream = urlConnection.getInputStream();
-            BufferedReader br = new BufferedReader(new InputStreamReader(
-                    iStream));
+            BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
             StringBuffer sb = new StringBuffer();
             String line = "";
             while ((line = br.readLine()) != null) {

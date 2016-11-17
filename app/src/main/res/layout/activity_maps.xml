@@ -74,5 +74,39 @@
         android:layout_marginTop="150dp"
         android:visibility="gone"
         android:paddingRight="10dp"/>
+
+    <RadioGroup
+        android:id="@+id/mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:layout_marginTop="200dp">
+
+        <RadioButton
+            android:id="@+id/walking"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="walking"
+            android:checked="true"/>
+
+        <RadioButton
+            android:id="@+id/driving"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="driving" />
+
+        <RadioButton
+            android:id="@+id/bicycle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="bicycling" />
+
+        <RadioButton
+            android:id="@+id/transit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="transit" />
+
+    </RadioGroup>
     <requestFocus />
 </fragment>

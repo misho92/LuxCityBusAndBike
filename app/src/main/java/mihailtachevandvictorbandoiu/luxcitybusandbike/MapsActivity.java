@@ -3,7 +3,9 @@ package mihailtachevandvictorbandoiu.luxcitybusandbike;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.StrictMode;
@@ -37,6 +39,9 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,6 +50,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import static mihailtachevandvictorbandoiu.luxcitybusandbike.R.id.buses;
 
@@ -58,14 +64,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Location mLastLocation;
     Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
-    String [] busList;
+    String[] busList;
     ArrayList<String> allStops;
     //save for each stop its bus list
-    HashMap<String,String[]> busListStop = new HashMap<String,String[]>();
+    HashMap<String, String[]> busListStop = new HashMap<String, String[]>();
     //coordinates of a stop
-    HashMap<String,String> coordinates = new HashMap<String,String>();
-    HashMap<String,String> connString = new HashMap<String,String>();
+    HashMap<String, String> coordinates = new HashMap<String, String>();
+    HashMap<String, String> connString = new HashMap<String, String>();
     AutoCompleteTextView auto;
+
+    Button route;
+    Double nearestLat;
+    Double nearestLng;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,16 +98,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLastLocation.setLatitude(49.620181);
         mLastLocation.setLongitude(6.120503);
 
+        route = (Button) findViewById(R.id.route);
+
         //handling the nearest stop button click
         final Button nearestBus = (Button) findViewById(R.id.nearest);
         nearestBus.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                route.setVisibility(View.VISIBLE);
                 String stop = nearestStop("bus");
-                String buses = getAllBuses(stop.split(";")[1],stop.split(";")[0]);
+                String buses = getAllBuses(stop.split(";")[1], stop.split(";")[0]);
                 //if no buses display none
-                if(buses.equals("")) buses = "none";
+                if (buses.equals("")) buses = "none";
+                nearestLat = Double.parseDouble(stop.split(";")[1].replace(",", "."));
+                nearestLng = Double.parseDouble(stop.split(";")[0].replace(",", "."));
                 //once the stop details are taken navigate user to it
-                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(";")[1].replace(",",".")), Double.parseDouble(stop.split(";")[0].replace(",",".")));
+                LatLng nearestStop = new LatLng(nearestLat, nearestLng);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
@@ -107,9 +122,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final Button nearestVeloh = (Button) findViewById(R.id.nearestVeloh);
         nearestVeloh.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                route.setVisibility(View.VISIBLE);
                 String stop = nearestStop("veloh");
+                nearestLat = Double.parseDouble(stop.split(",")[1]);
+                nearestLng = Double.parseDouble(stop.split(",")[2]);
                 //once the stop details are taken navigate user to it
-                LatLng nearestStop = new LatLng(Double.parseDouble(stop.split(",")[1]), Double.parseDouble(stop.split(",")[2]));
+                LatLng nearestStop = new LatLng(nearestLat, nearestLng);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
             }
@@ -126,6 +144,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mMap.clear();
                 listAllVelohStations(String.valueOf(progresValue));
             }
+
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
                 //Toast.makeText(getApplicationContext(), "Started tracking seekbar", Toast.LENGTH_SHORT).show();
@@ -142,48 +161,55 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         toggle.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(toggle.isChecked()){
+                if (toggle.isChecked()) {
                     mMap.clear();
                     long startTime = System.nanoTime();
                     listAllBusStations();
                     Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
                     long estimatedTime = System.nanoTime() - startTime;
-                    Log.d("time",String.valueOf(estimatedTime));
-                }
-                else{
+                    Log.d("time", String.valueOf(estimatedTime));
+                } else {
                     mMap.clear();
                     listAllVelohStations("all");
                     Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_LONG).show();
                 }
             }
         });
+
         allStops = new ArrayList<String>();
+
+        route.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                showRoute();
+            }
+        });
     }
 
     //get all the bus data about a specific bus stop
-    public String getAllBuses(String connectionString, String stop){
+    public String getAllBuses(String connectionString, String stop) {
         String result = "";
         String str;
-        try{
+        try {
             //get all the buses currently at the particular stop
             connectionString = connectionString.replaceAll(" ", "%20");
-            URL url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";","").replace(" ","") +"&format=json");
+            URL url = new URL("http://travelplanner.mobiliteit.lu/restproxy/departureBoard?accessId=cdt&" + connectionString.replace(";", "").replace(" ", "") + "&format=json");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
                 //there are buses going on
-                if(!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")){
+                if (!str.equals("{\"serverVersion\":\"1.0\",\"dialectVersion\":\"1.0\"}")) {
                     //send it to the secondary activity on user click
                     busList = str.split("line");
-                    busListStop.put(stop,busList);
-                    for(int i = 1; i < busList.length; i++){
+                    busListStop.put(stop, busList);
+                    for (int i = 1; i < busList.length; i++) {
                         //no comma if it is the final element
-                        if(i == busList.length-1) result += busList[i].substring(3).split("\"")[0];
+                        if (i == busList.length - 1)
+                            result += busList[i].substring(3).split("\"")[0];
                         else result += busList[i].substring(3).split("\"")[0] + ",";
                     }
                 }
             }
             in.close();
-        }catch (MalformedURLException e) {
+        } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -198,20 +224,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //computing nearest bus or veloh stop with the API provided
-    public String nearestStop(String string){
+    public String nearestStop(String string) {
         String result = "";
         String str;
         double nearest = 999999999;
         String stopName;
         try {
             //take all the stations from the api
-            if(string.equals("bus")){
+            if (string.equals("bus")) {
                 URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes.txt");
                 //read all the text returned by the server
                 BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
                 while ((str = in.readLine()) != null) {
                     //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
-                    if(str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
+                    if (str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
                             str.contains("Cents,") || str.contains("Cessange,") || str.contains("Clausen,") || str.contains("Dommeldange,") ||
                             str.contains("Eich,") || str.contains("Luxembourg,") || str.contains("Gasperich,") || str.contains("Grund,") ||
                             str.contains("Hamm,") || str.contains("Hollerich,") || str.contains("Kirchberg,") || str.contains("Limpertsberg,") ||
@@ -219,17 +245,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             str.contains("Centre,") || str.contains("Pfaffenthal,") || str.contains("Pulvermuhl,")
                             || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
                         Location stop = new Location("station");
-                        stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",",".")));
-                        stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",",".")));
+                        stop.setLatitude(Double.parseDouble(str.split(";")[1].replace(",", ".")));
+                        stop.setLongitude(Double.parseDouble(str.split(";")[0].replace(",", ".")));
                         //check distance for each stop and remember only the one with the shortest distance
-                        if(mLastLocation.distanceTo(stop) < nearest){
+                        if (mLastLocation.distanceTo(stop) < nearest) {
                             nearest = mLastLocation.distanceTo(stop);
                             result = str;
                         }
                     }
                 }
                 in.close();
-            }else{
+            } else {
                 //URL url = new URL("https://developer.jcdecaux.com/rest/vls/stations/Luxembourg.csv");
                 URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
                 //read all the text returned by the server
@@ -237,17 +263,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 double latitude, longitude = 0;
                 int bikes = 0;
                 while ((str = in.readLine()) != null) {
-                    String stations [] = str.split("last_update");
-                    for(int i = 0; i < stations.length - 1; i++){
-                        stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                    String stations[] = str.split("last_update");
+                    for (int i = 0; i < stations.length - 1; i++) {
+                        stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"", "");
                         bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
                         Location stop = new Location("station");
                         latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
-                        longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
+                        longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}", ""));
                         stop.setLatitude(latitude);
                         stop.setLongitude(longitude);
                         //check distance for each stop and remember only the one with the shortest distance
-                        if(mLastLocation.distanceTo(stop) < nearest){
+                        if (mLastLocation.distanceTo(stop) < nearest) {
                             nearest = mLastLocation.distanceTo(stop);
                             result = stopName + "," + latitude + "," + longitude + "," + bikes;
                         }
@@ -282,9 +308,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
-                if(marker.getSnippet().contains("Buses")) {
-                    String buses = getAllBuses(connString.get(marker.getTitle()),marker.getTitle());
-                    if(buses.equals("")) buses = "none";
+                if (marker.getSnippet().contains("Buses")) {
+                    String buses = getAllBuses(connString.get(marker.getTitle()), marker.getTitle());
+                    if (buses.equals("")) buses = "none";
                     marker.setSnippet("Buses: " + buses);
                 }
                 return false;
@@ -292,16 +318,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         });
 
         //auto completion for all stops
-        auto = (AutoCompleteTextView)findViewById(R.id.autoCompleteTextView1);
+        auto = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView1);
         String[] stops = new String[allStops.size()];
         stops = allStops.toArray(stops);
-        ArrayAdapter adapter = new ArrayAdapter(this,android.R.layout.simple_list_item_1,stops);
+        ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, stops);
         auto.setAdapter(adapter);
         auto.setThreshold(1);
 
         auto.setOnItemClickListener(new OnItemClickListener() {
             public void onItemClick(AdapterView<?> parent, View view, int position, long rowId) {
-                String stop = (String)parent.getItemAtPosition(position);
+                String stop = (String) parent.getItemAtPosition(position);
                 LatLng coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
                         Double.parseDouble(coordinates.get(stop).split(";")[1]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 16.0f));
@@ -324,8 +350,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 buildGoogleApiClient();
                 mMap.setMyLocationEnabled(true);
             }
-        }
-        else {
+        } else {
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
         }
@@ -338,11 +363,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Bundle bundle = new Bundle();
                 double longitude = marker.getPosition().longitude;
                 //send veloh details
-                if(marker.getSnippet().contains("bike")) bundle.putStringArray("data", new String []{"bike",
-                        String.valueOf(marker.getPosition().latitude),String.valueOf(marker.getPosition().longitude)});
-                //send bus details
+                if (marker.getSnippet().contains("bike"))
+                    bundle.putStringArray("data", new String[]{"bike",
+                            String.valueOf(marker.getPosition().latitude), String.valueOf(marker.getPosition().longitude)});
+                    //send bus details
                 else bundle.putStringArray("data", busListStop.get(marker.getTitle()));
-                Intent i = new Intent(getApplicationContext(),SecondaryActivity.class);
+                Intent i = new Intent(getApplicationContext(), SecondaryActivity.class);
                 i.putExtras(bundle);
                 startActivity(i);
             }
@@ -350,44 +376,44 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //list all the veloh stations within the distance
-    public void listAllVelohStations(String distance){
+    public void listAllVelohStations(String distance) {
         String str;
         String stopName;
-        try{
+        try {
             URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             double latitude, longitude = 0;
             int bikes = 0;
             while ((str = in.readLine()) != null) {
-                String stations [] = str.split("last_update");
-                for(int i = 0; i < stations.length - 1; i++){
-                    stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"","");
+                String stations[] = str.split("last_update");
+                for (int i = 0; i < stations.length - 1; i++) {
+                    stopName = stations[i].split("name")[1].split(",")[0].substring(3).replace("\"", "");
                     allStops.add(stopName);
                     bikes = Integer.parseInt(stations[i].split("available_bikes")[1].split(",")[0].substring(2));
                     latitude = Double.parseDouble(stations[i].split("lat")[1].split(",")[0].substring(2));
-                    longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}",""));
-                    coordinates.put(stopName,latitude + ";" + longitude);
+                    longitude = Double.parseDouble(stations[i].split("lng")[1].split(",")[0].substring(2).replace("}", ""));
+                    coordinates.put(stopName, latitude + ";" + longitude);
                     //list all
-                    if(distance.equals("all")){
+                    if (distance.equals("all")) {
                         LatLng stop = new LatLng(latitude, longitude);
                         mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
-                    }else{
-                        if(!distance.equals("")){
+                    } else {
+                        if (!distance.equals("")) {
                             //list all station within the range
                             Location stop = new Location("station");
                             stop.setLatitude(latitude);
                             stop.setLongitude(longitude);
                             //check if the stop is in the given range
-                            if(mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)){
+                            if (mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)) {
                                 mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
-                                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 14.0f));
+                                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), 14.0f));
                             }
                         }
                     }
                 }
             }
             in.close();
-        }catch (MalformedURLException e) {
+        } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -395,15 +421,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //list all the bus stations
-    public void listAllBusStations(){
+    public void listAllBusStations() {
         String str;
         String stopName;
-        try{
+        try {
             URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
             while ((str = in.readLine()) != null) {
                 //only the ones in LUX city according to https://en.wikipedia.org/wiki/Quarters_of_Luxembourg_City
-                if(str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
+                if (str.contains("Beggen,") || str.contains("Belair,") || str.contains("Verlorenkost,") || str.contains("Bonnevoie,") ||
                         str.contains("Cents,") || str.contains("Cessange,") || str.contains("Clausen,") || str.contains("Dommeldange,") ||
                         str.contains("Eich,") || str.contains("Luxembourg,") || str.contains("Gasperich,") || str.contains("Grund,") ||
                         str.contains("Hamm,") || str.contains("Hollerich,") || str.contains("Kirchberg,") || str.contains("Limpertsberg,") ||
@@ -412,18 +438,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         || str.contains("Rollingergrund,") || str.contains("Weimerskirch,") || str.contains("Luxembourg/Centre,")) {
                     stopName = str.split("O")[1].substring(1).split("@")[0];
                     allStops.add(stopName);
-                    connString.put(stopName,str);
+                    connString.put(stopName, str);
                     //String buses = getAllBuses(str,stopName);
                     //if(buses.equals("")) buses = "none";
-                    LatLng stop = new LatLng(Double.parseDouble(str.split("Y=")[1].split("@")[0].replace(",",".")),
-                            Double.parseDouble(str.split("X=")[1].split("@")[0].replace(",",".")));
-                    coordinates.put(stopName,str.split("Y=")[1].split("@")[0].replace(",",".") + ";" +
-                            str.split("X=")[1].split("@")[0].replace(",","."));
+                    LatLng stop = new LatLng(Double.parseDouble(str.split("Y=")[1].split("@")[0].replace(",", ".")),
+                            Double.parseDouble(str.split("X=")[1].split("@")[0].replace(",", ".")));
+                    coordinates.put(stopName, str.split("Y=")[1].split("@")[0].replace(",", ".") + ";" +
+                            str.split("X=")[1].split("@")[0].replace(",", "."));
                     mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 }
             }
             in.close();
-        }catch (MalformedURLException e) {
+        } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -510,7 +536,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //check permissions
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-    public boolean checkLocationPermission(){
+
+    public boolean checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             //clarification needed
             if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -545,6 +572,103 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
                 return;
             }
+        }
+    }
+
+    private void showRoute(){
+        MarkerOptions options = new MarkerOptions();
+        options.position(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()));
+        options.position(new LatLng(nearestLat,nearestLng));
+        mMap.addMarker(options);
+        String url = getMapsApiDirectionsUrl();
+        ReadTask downloadTask = new ReadTask();
+        downloadTask.execute(url);
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 16));
+        addMarkers();
+    }
+
+    //maps data
+    private String getMapsApiDirectionsUrl() {
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=" + mLastLocation.getLatitude() + "," + mLastLocation.getLongitude() + "&mode=walking&destination=" + nearestLat + "," + nearestLng + "&key=AIzaSyB5FzALlUScawxBeTcoaBOdf5Rch9hZu-A";
+    }
+
+    //add markers
+    private void addMarkers() {
+        if (mMap != null) {
+            mMap.addMarker(new MarkerOptions().position(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude())).title("Current position"));
+            mMap.addMarker(new MarkerOptions().position(new LatLng(nearestLat,nearestLng)).title("Nearest stop"));
+        }
+    }
+
+    //background task
+    private class ReadTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... url) {
+            String data = "";
+            try {
+                HTTPConnection http = new HTTPConnection();
+                data = http.readUrl(url[0]);
+            } catch (Exception e) {
+                Log.d("Background Task", e.toString());
+            }
+            return data;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            new ParserTask().execute(result);
+        }
+    }
+
+    private class ParserTask extends
+            AsyncTask<String, Integer, List<List<HashMap<String, String>>>> {
+
+        @Override
+        protected List<List<HashMap<String, String>>> doInBackground(
+                String... jsonData) {
+
+            JSONObject jObject;
+            List<List<HashMap<String, String>>> routes = null;
+
+            try {
+                jObject = new JSONObject(jsonData[0]);
+                Parser parser = new Parser();
+                routes = parser.parse(jObject);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return routes;
+        }
+
+        //displaying the route on the map
+        @Override
+        protected void onPostExecute(List<List<HashMap<String, String>>> routes) {
+            ArrayList<LatLng> points = null;
+            PolylineOptions polyLineOptions = null;
+
+            // traversing through routes
+            for (int i = 0; i < routes.size(); i++) {
+                points = new ArrayList<LatLng>();
+                polyLineOptions = new PolylineOptions();
+                List<HashMap<String, String>> path = routes.get(i);
+
+                for (int j = 0; j < path.size(); j++) {
+                    HashMap<String, String> point = path.get(j);
+
+                    double lat = Double.parseDouble(point.get("lat"));
+                    double lng = Double.parseDouble(point.get("lng"));
+                    LatLng position = new LatLng(lat, lng);
+
+                    points.add(position);
+                }
+
+                polyLineOptions.addAll(points);
+                polyLineOptions.width(10);
+                polyLineOptions.color(Color.BLUE);
+            }
+
+            mMap.addPolyline(polyLineOptions);
         }
     }
 }

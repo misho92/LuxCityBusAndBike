@@ -64,5 +64,15 @@
         android:layout_alignStart="@+id/imageView"
         android:layout_marginTop="100dp"
         android:hint="Enter a stop"/>
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|top"
+        android:id="@+id/route"
+        android:text="Show route"
+        android:padding="10dp"
+        android:layout_marginTop="150dp"
+        android:visibility="gone"
+        android:paddingRight="10dp"/>
     <requestFocus />
 </fragment>

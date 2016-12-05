@@ -82,6 +82,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     RadioButton modeButton;
     RadioGroup modeGroup;
     Polyline line;
+    boolean veloh = true;
+    boolean stopByName = false;
+    LatLng coord;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,6 +125,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
+                stopByName = false;
             }
         });
 
@@ -138,8 +142,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
                 mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
+                stopByName = false;
             }
         });
+
+        if(veloh){
+            nearestBus.setVisibility(View.INVISIBLE);
+            nearestVeloh.setVisibility(View.VISIBLE);
+        }
+
         //slider for distance to stops
         final SeekBar seekBar = (SeekBar) findViewById(R.id.seekBar1);
         final TextView textView = (TextView) findViewById(R.id.textView1);
@@ -176,10 +187,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
                     long estimatedTime = System.nanoTime() - startTime;
                     Log.d("time", String.valueOf(estimatedTime));
+                    nearestBus.setVisibility(View.VISIBLE);
+                    nearestVeloh.setVisibility(View.INVISIBLE);
+                    auto.setText("");
                 } else {
                     mMap.clear();
                     listAllVelohStations("all");
                     Toast.makeText(getApplicationContext(), "Veloh mode on", Toast.LENGTH_LONG).show();
+                    nearestBus.setVisibility(View.INVISIBLE);
+                    nearestVeloh.setVisibility(View.VISIBLE);
+                    auto.setText("");
                 }
             }
         });
@@ -338,20 +355,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
-        //auto completion for all stops
-        auto = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView1);
-        String[] stops = new String[allStops.size()];
-        stops = allStops.toArray(stops);
-        ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, stops);
-        auto.setAdapter(adapter);
-        auto.setThreshold(1);
-
         auto.setOnItemClickListener(new OnItemClickListener() {
             public void onItemClick(AdapterView<?> parent, View view, int position, long rowId) {
                 String stop = (String) parent.getItemAtPosition(position);
-                LatLng coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
+                coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
                         Double.parseDouble(coordinates.get(stop).split(";")[1]));
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 16.0f));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 18.0f));
+                stopByName = true;
+                route.setVisibility(View.VISIBLE);
+                modeGroup.setVisibility(View.VISIBLE);
             }
         });
 
@@ -400,6 +412,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void listAllVelohStations(String distance) {
         String str;
         String stopName;
+        allStops = new ArrayList<String>();
         try {
             URL url = new URL("https://api.jcdecaux.com/vls/v1/stations?contract=Luxembourg&apiKey=96b9ee7224b03b6d262fe0be39c0c7645c9f714f");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
@@ -433,6 +446,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 }
             }
+            //auto completion for all stops
+            auto = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView1);
+            String[] stops = new String[allStops.size()];
+            stops = allStops.toArray(stops);
+            ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, stops);
+            auto.setAdapter(adapter);
+            auto.setThreshold(1);
             in.close();
         } catch (MalformedURLException e) {
             e.printStackTrace();
@@ -445,6 +465,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void listAllBusStations() {
         String str;
         String stopName;
+        allStops = new ArrayList<String>();
         try {
             URL url = new URL("http://travelplanner.mobiliteit.lu/hafas/query.exe/dot?performLocating=2&tpl=stop2csv&look_maxdist=150000&look_x=6112550&look_y=49610700&stationProxy=yes");
             BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
@@ -469,6 +490,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
                 }
             }
+            //auto completion for all stops
+            auto = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView1);
+            String[] stops = new String[allStops.size()];
+            stops = allStops.toArray(stops);
+            ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, stops);
+            auto.setAdapter(adapter);
+            auto.setThreshold(1);
             in.close();
         } catch (MalformedURLException e) {
             e.printStackTrace();
@@ -527,6 +555,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (mGoogleApiClient != null) {
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
         }
+
+        //update the route on every change of location
+        //if(route.getVisibility() == View.VISIBLE) showRoute();
+
     }
 
     @Override
@@ -599,19 +631,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void showRoute(){
         MarkerOptions options = new MarkerOptions();
         options.position(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()));
-        options.position(nearestStation);
-        mMap.addMarker(options);
-        String url = getMapsApiDirectionsUrl();
-        ReadTask downloadTask = new ReadTask();
-        downloadTask.execute(url);
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 16));
+        if(stopByName) {
+            options.position(coord);
+            mMap.addMarker(options);
+            String url = getMapsApiDirectionsUrlByStop();
+            ReadTask downloadTask = new ReadTask();
+            downloadTask.execute(url);
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 16));
+        }
+        else {
+            options.position(nearestStation);
+            mMap.addMarker(options);
+            String url = getMapsApiDirectionsUrl();
+            ReadTask downloadTask = new ReadTask();
+            downloadTask.execute(url);
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(),mLastLocation.getLongitude()), 16));
+        }
     }
 
-    //directions api data
+    //directions api data for nearest stop
     private String getMapsApiDirectionsUrl() {
         return "https://maps.googleapis.com/maps/api/directions/json?origin=" + mLastLocation.getLatitude() + "," +
                 mLastLocation.getLongitude() + "&destination=" + nearestStation.latitude + "," +
                 nearestStation.longitude + "&mode=" + mode + "&key=AIzaSyB5FzALlUScawxBeTcoaBOdf5Rch9hZu-A";
+    }
+
+    //directions api data for search by stop
+    private String getMapsApiDirectionsUrlByStop() {
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=" + mLastLocation.getLatitude() + "," +
+                mLastLocation.getLongitude() + "&destination=" + coord.latitude + "," +
+                coord.longitude + "&mode=" + mode + "&key=AIzaSyB5FzALlUScawxBeTcoaBOdf5Rch9hZu-A";
     }
 
     //background task

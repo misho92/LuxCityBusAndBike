@@ -161,7 +161,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             public void onProgressChanged(SeekBar seekBar, int progresValue, boolean fromUser) {
                 progress = progresValue;
                 mMap.clear();
-                listAllVelohStations(String.valueOf(progresValue));
+                if(veloh) listAllVelohStations(String.valueOf(progresValue));
+                else listAllBusStations(String.valueOf(progresValue));
             }
 
             @Override
@@ -183,13 +184,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (toggle.isChecked()) {
                     mMap.clear();
                     long startTime = System.nanoTime();
-                    listAllBusStations();
+                    listAllBusStations("all");
                     Toast.makeText(getApplicationContext(), "Bus mode on", Toast.LENGTH_LONG).show();
                     long estimatedTime = System.nanoTime() - startTime;
                     Log.d("time", String.valueOf(estimatedTime));
                     nearestBus.setVisibility(View.VISIBLE);
                     nearestVeloh.setVisibility(View.INVISIBLE);
                     auto.setText("");
+                    veloh = false;
                 } else {
                     mMap.clear();
                     listAllVelohStations("all");
@@ -462,7 +464,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     //list all the bus stations
-    private void listAllBusStations() {
+    private void listAllBusStations(String distance) {
         String str;
         String stopName;
         allStops = new ArrayList<String>();
@@ -481,13 +483,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     stopName = str.split("O")[1].substring(1).split("@")[0];
                     allStops.add(stopName);
                     connString.put(stopName, str);
-                    //String buses = getAllBuses(str,stopName);
-                    //if(buses.equals("")) buses = "none";
                     LatLng stop = new LatLng(Double.parseDouble(str.split("Y=")[1].split("@")[0].replace(",", ".")),
                             Double.parseDouble(str.split("X=")[1].split("@")[0].replace(",", ".")));
-                    coordinates.put(stopName, str.split("Y=")[1].split("@")[0].replace(",", ".") + ";" +
-                            str.split("X=")[1].split("@")[0].replace(",", "."));
-                    mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                    //String buses = getAllBuses(str,stopName);
+                    //if(buses.equals("")) buses = "none";
+                    if(distance.equals("all")){
+                        coordinates.put(stopName, str.split("Y=")[1].split("@")[0].replace(",", ".") + ";" +
+                                str.split("X=")[1].split("@")[0].replace(",", "."));
+                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                    }
+                    else{
+                        Location station = new Location("station");
+                        station.setLatitude(stop.latitude);
+                        station.setLongitude(stop.longitude);
+                        //check if the stop is in the given range
+                        if (mLastLocation.distanceTo(station) <= Double.parseDouble(distance)) {
+                            mMap.addMarker(new MarkerOptions().position(new LatLng(stop.latitude, stop.longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), 14.0f));
+                        }
+                    }
+
                 }
             }
             //auto completion for all stops

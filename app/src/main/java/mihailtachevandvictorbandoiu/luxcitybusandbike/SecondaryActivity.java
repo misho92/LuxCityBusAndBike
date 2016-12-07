@@ -7,7 +7,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.widget.ListView;
 import android.widget.TextView;
 
-//secondary activity for showing bus details
+//secondary activity for showing bus or veloh details
 public class SecondaryActivity extends AppCompatActivity {
 
     Context context;

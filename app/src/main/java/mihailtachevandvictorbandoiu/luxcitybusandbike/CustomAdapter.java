@@ -132,8 +132,8 @@ public class CustomAdapter extends BaseAdapter{
             if(now.after(busTime)) holder.textView.setBackgroundColor(Color.RED);
             else holder.textView.setBackgroundColor(Color.GREEN);
         }
-        if(bus)holder.img.setImageResource(R.drawable.bus);
-        else holder.img.setImageResource(R.drawable.bike);
+        if(bus)holder.img.setImageResource(R.mipmap.bus);
+        else holder.img.setImageResource(R.mipmap.bike);
         rowView.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {

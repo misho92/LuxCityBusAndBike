@@ -125,7 +125,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         Double.parseDouble(stop.split(";")[0].replace(",", ".")));
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(";")[3]).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bus)).snippet("Buses: " + buses));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
                 stopByName = false;
             }
@@ -142,7 +142,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         Double.parseDouble(stop.split(",")[2]));
                 //once the stop details are taken navigate user to it
                 LatLng nearestStop = new LatLng(nearestStation.latitude, nearestStation.longitude);
-                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + stop.split(",")[3]));
+                mMap.addMarker(new MarkerOptions().position(nearestStop).title(stop.split(",")[0]).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bike)).snippet("Available bikes: " + stop.split(",")[3]));
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(nearestStop, 18.0f));
                 stopByName = false;
             }
@@ -201,6 +201,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     nearestBus.setVisibility(View.INVISIBLE);
                     nearestVeloh.setVisibility(View.VISIBLE);
                     auto.setText("");
+                    veloh = true;
                 }
             }
         });
@@ -435,7 +436,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     //list all
                     if (distance.equals("all")) {
                         LatLng stop = new LatLng(latitude, longitude);
-                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bike)).snippet("Available bikes: " + bikes));
                     } else {
                         if (!distance.equals("")) {
                             //list all station within the range
@@ -444,7 +445,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             stop.setLongitude(longitude);
                             //check if the stop is in the given range
                             if (mLastLocation.distanceTo(stop) <= Double.parseDouble(distance)) {
-                                mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bike)).snippet("Available bikes: " + bikes));
+                                mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bike)).snippet("Available bikes: " + bikes));
                                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), 14.0f));
                             }
                         }
@@ -493,7 +494,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     if(distance.equals("all")){
                         coordinates.put(stopName, str.split("Y=")[1].split("@")[0].replace(",", ".") + ";" +
                                 str.split("X=")[1].split("@")[0].replace(",", "."));
-                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                        mMap.addMarker(new MarkerOptions().position(stop).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bus)).snippet("Buses: " + buses));
                     }
                     else{
                         Location station = new Location("station");
@@ -501,7 +502,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         station.setLongitude(stop.longitude);
                         //check if the stop is in the given range
                         if (mLastLocation.distanceTo(station) <= Double.parseDouble(distance)) {
-                            mMap.addMarker(new MarkerOptions().position(new LatLng(stop.latitude, stop.longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.drawable.bus)).snippet("Buses: " + buses));
+                            mMap.addMarker(new MarkerOptions().position(new LatLng(stop.latitude, stop.longitude)).title(stopName).icon(BitmapDescriptorFactory.fromResource(R.mipmap.bus)).snippet("Buses: " + buses));
                             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()), 14.0f));
                         }
                     }

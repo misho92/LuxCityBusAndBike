@@ -10,7 +10,7 @@
         android:layout_gravity="center"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:src="@drawable/bus" />
+        android:src="@mipmap/bus" />
 
     <TextView
         android:id="@+id/textView"

@@ -17,7 +17,6 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
@@ -110,6 +109,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLastLocation.setLongitude(6.120503);
 
         route = (Button) findViewById(R.id.route);
+        auto = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView1);
 
         //handling the nearest stop button click
         final Button nearestBus = (Button) findViewById(R.id.nearest);
@@ -226,6 +226,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 showRoute();
             }
         });
+
+        auto.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long rowId) {
+                String stop = (String) parent.getItemAtPosition(position);
+                coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
+                        Double.parseDouble(coordinates.get(stop).split(";")[1]));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 18.0f));
+                stopByName = true;
+                route.setVisibility(View.VISIBLE);
+                modeGroup.setVisibility(View.VISIBLE);
+            }
+        });
+
         deleteCache(getApplicationContext());
     }
 
@@ -358,18 +371,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     marker.setSnippet("Buses: " + buses);
                 }
                 return false;
-            }
-        });
-
-        auto.setOnItemClickListener(new OnItemClickListener() {
-            public void onItemClick(AdapterView<?> parent, View view, int position, long rowId) {
-                String stop = (String) parent.getItemAtPosition(position);
-                coord = new LatLng(Double.parseDouble(coordinates.get(stop).split(";")[0]),
-                        Double.parseDouble(coordinates.get(stop).split(";")[1]));
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coord, 18.0f));
-                stopByName = true;
-                route.setVisibility(View.VISIBLE);
-                modeGroup.setVisibility(View.VISIBLE);
             }
         });
 
